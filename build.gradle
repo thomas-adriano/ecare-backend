@@ -1,0 +1,72 @@
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url 'https://dl.bintray.com/nikit007/mvn-repo/'
+        }
+    }
+    dependencies {
+        classpath "com.github.nikit.cpp.helpers:db:1.0.7" // need for use helpers.MysqlHelper
+        classpath "gradle.plugin.com.github.nikit.cpp:wildflyDeployPlugin:1.0.8"
+    }
+}
+
+apply plugin: 'war'
+apply plugin: 'idea'
+apply plugin: "com.github.nikit.cpp.wildfly.deploy"
+
+configurations {
+    provided {
+        dependencies.all { dep ->
+            configurations.default.exclude group: dep.group, module: dep.name
+        }
+    }
+    compile.extendsFrom provided
+}
+
+idea {
+    module {
+        scopes.PROVIDED.plus += [ configurations.provided ]
+    }
+}
+
+group 'br.furb'
+version '3.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'org.eclipse.persistence', name:'org.eclipse.persistence.jpa', version: '2.6.2'
+
+    def jerseyVer = '2.22.2'
+    compile "org.glassfish.jersey.core:jersey-server:${jerseyVer}"
+    runtime "org.glassfish.jersey.media:jersey-media-moxy:${jerseyVer}"
+
+    provided 'javax.ws.rs:javax.ws.rs-api:2.0.1'
+
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+}
+
+deployConfig {
+    deployFile = "scripts/deploy" // list of files to deploy
+    boxes = [
+            'Local' : [
+                    wildfly:new helpers.Server()
+            ]
+    ]
+}
+
+task refreshWildflyScript << {
+    ant.replaceregexp(file: './scripts/deploy', match: '.*', replace: "build/libs/${project.name}-${project.version}.war")
+}
+
+deployLocal.dependsOn war
+redeployLocal.dependsOn war
+deployLocal.dependsOn refreshWildflyScript
+redeployLocal.dependsOn refreshWildflyScript
